@@ -29,7 +29,7 @@ def load_headlines():
 
 
 
-def fetch_price(symbols, start='2009-01-01', end=None):
+def fetch_price(symbols, start='2009-01-01', end=None, batch_size=32):
     out_rows = []
     """
     Downloads historical stock data for a list of symbols (including S&P 500) 
@@ -39,9 +39,20 @@ def fetch_price(symbols, start='2009-01-01', end=None):
     yf_map = {'s&p': '^GSPC'}
     tickers = [yf_map.get(s.lower(), s) for s in symbols]
 
-    print("Downloading data for all symbols at once...")
-    # Download all tickers at once
-    df = yf.download(tickers, start=start, end=end, group_by='ticker', progress=False, auto_adjust=True)
+    print("Downloading data for all symbols")
+    print(tickers)
+    # all_data = {}
+
+    # for b_ix in range(0, len(tickers), batch_size):
+    #     print(f"Downloading batch {b_ix}")
+    #     batch = tickers[b_ix:b_ix + batch_size]
+    #     df = yf.download(batch, start=start, end=end, group_by='ticker', progress=False, auto_adjust=True, threads=False)
+    #     all_data.update({ticker: df[ticker] for ticker in batch if ticker in df.columns.get_level_values(0)})
+
+    # df = pd.concat(all_data, axis=1)
+    # print(df)
+    
+    df = yf.download(tickers, start=start, end=end, group_by='ticker', progress=False, auto_adjust=True, threads=False)
 
     all_rows = []
     for i, s in enumerate(symbols):
