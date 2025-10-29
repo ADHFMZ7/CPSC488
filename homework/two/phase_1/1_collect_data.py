@@ -71,7 +71,7 @@ def fetch_price(symbols, start='2010-01-01', end='2016-12-31', batch_size=128):
 
 
 def fetch_articles(urls):
-
+    ...
 
 
 
