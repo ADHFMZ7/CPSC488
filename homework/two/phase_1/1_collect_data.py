@@ -70,10 +70,47 @@ def fetch_price(symbols, start='2010-01-01', end='2016-12-31', batch_size=128):
     return all_data
 
 
-def fetch_articles(urls):
-    ...
+def fetch_articles(urls, max_workers=10, timeout=10):
+    """
+    Fetches full article text from a list of urls
+    """
+    
+    def fetch_single(url):
+        try:
+            response = requests.get(url, timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
+            if response.status_code != 200:
+                return url, None
+            
+            soup = BeautifulSoup(response.text, 'html.parser')
+
+            # Attempting to extract artcle text from common HTML tags
+            paragraphs = soup.find_all('p')
+            article_text = ' '.join(p.get_text(strip=True) for p in paragraphs)
+
+            # Cleanup
+            article_text = article_text.replace('\xa0', ' ').strip()
+
+            if len(article_text) < 100:
+                return url, None
+            
+            return url, article_text
+        
+        except Exception as e:
+            print(f"Skipped: {url}")
+            return url, None
+    print(f"Fetching {len(urls)} articles...")
+    results = []
+
+    # Parallel downloading
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_url = {executor.submit(fetch_single, url): url for url in urls}
+        for future in as_completed(future_to_url):
+            url, article = future.result()
+            results.append({'URL': url, 'article': article})
 
 
+            df = pd.DataFrame(results)
+            return df
 
 
 def main():
@@ -110,20 +147,17 @@ def main():
     
     print("Saved historical_prices.csv and all_news.csv")
 
+    # Fetching full article
+    demo_alln = alln.head(500).copy()
+    article_df = fetch_articles(demo_alln['URL'])
+    demo_alln = demo_alln.merge(article_df, on='URL', how='left')
+
+
+    # Save combined dataset
+    demo_alln.to_csv(DATA_DIR / 'all_news.csv', index=False)
+
+
 if __name__ == '__main__':
     main()
 
 
-
-
-
-
-
-
-
-
-# headlines = pd.read_csv('../../../data/news_datasets/headlines.csv')
-# ratings = pd.read_csv('../../../data/news_datasets/analyst_ratings.csv')
-
-# print(headlines.head())
-# print(ratings.head())
