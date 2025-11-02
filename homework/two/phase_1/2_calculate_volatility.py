@@ -17,7 +17,6 @@ def compute_volatility(price_df):
                                            .reset_index(level=0, drop=True)
     )
 
-
     # Market-adj return and volatility
     market = price_df[price_df.symbol == 's&p'][['date', 'daily_return']]
     market = market.rename(columns={'daily_return': 'market_return'})
@@ -40,13 +39,16 @@ def compute_volatility(price_df):
 
     price_df['idiosyn_return'] = price_df.daily_return - (price_df.alpha + price_df.beta * price_df.market_return)
     
-    idiosyn_vol = price_df.groupby('symbol')['idiosyn_return'].std()
-    price_df = price_df.merge(idiosyn_vol.rename('idiosyn_volatility'), on='symbol', how='left')
+    price_df['idiosyn_volatility'] = (price_df.groupby('symbol').idiosyn_return
+                                           .rolling(window=3)
+                                           .std()
+                                           .reset_index(level=0, drop=True)
+    )
 
-    price_df['market_adj_return'] = price_df.alpha + price_df.beta * price_df.market_return 
-    price_df['market_adj_volatility'] = None
+    price_df['market_adj_return'] = price_df.idiosyn_return
+    price_df['market_adj_volatility'] = price_df.idiosyn_volatility
 
-
+    return price_df
 
 def main():
     # Loading historical prices
