@@ -1,10 +1,13 @@
+import time
+from tqdm.auto import tqdm
+from pathlib import Path
 import pandas as pd
 import yfinance as yf
-import time
-from pathlib import Path
 import requests
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from newspaper import Article
+import trafilatura
 
 
 DATA_DIR = Path('datasets')
@@ -22,6 +25,9 @@ def load_headlines():
     
     # Merge datasets
     alln = pd.concat([a, b], ignore_index=True, sort=False)
+
+    alln['date'] = alln.date.astype(str).apply(lambda x: x.strip().split(' ')[0])
+    alln['date'] = pd.to_datetime(alln['date'], format='%Y-%m-%d')
     
     # Keep only required columns
     alln = alln[['date', 'symbol', 'headline', 'URL', 'publisher']]
@@ -30,7 +36,6 @@ def load_headlines():
 
 
 def fetch_price(symbols, start='2010-01-01', end='2016-12-31', batch_size=128):
-    out_rows = []
     """
     Downloads historical stock data for a list of symbols (including S&P 500) 
     and returns a DataFrame with columns: date, symbol, open, high, low, close, volume
@@ -66,51 +71,43 @@ def fetch_price(symbols, start='2010-01-01', end='2016-12-31', batch_size=128):
 
         all_data = pd.concat([all_data, prices])
         time.sleep(2)
-
+   
+    all_data['symbol'] = all_data['symbol'].replace('^GSPC', 's&p')
     return all_data
 
 
-def fetch_articles(urls, max_workers=10, timeout=10):
-    """
-    Fetches full article text from a list of urls
-    """
-    
-    def fetch_single(url):
-        try:
-            response = requests.get(url, timeout=timeout, headers={'User-Agent': 'Mozilla/5.0'})
-            if response.status_code != 200:
-                return url, None
-            
-            soup = BeautifulSoup(response.text, 'html.parser')
+def extract_article(url):
+    try:    
+        html = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}).text
+        text = trafilatura.extract(html)
+        if not text:
+            article = Article(url)
+            article.download()
+            article.parse()
+            text = article.text
+        return text
+    except Exception as e:
+        return None
 
-            # Attempting to extract artcle text from common HTML tags
-            paragraphs = soup.find_all('p')
-            article_text = ' '.join(p.get_text(strip=True) for p in paragraphs)
+def fetch_articles(df, start='2010-01-01', end='2016-12-31', n=5000):
 
-            # Cleanup
-            article_text = article_text.replace('\xa0', ' ').strip()
+    # df of form Index(['date', 'symbol', 'headline', 'URL', 'publisher'], dtype='object')
 
-            if len(article_text) < 100:
-                return url, None
-            
-            return url, article_text
-        
-        except Exception as e:
-            print(f"Skipped: {url}")
-            return url, None
-    print(f"Fetching {len(urls)} articles...")
-    results = []
+    # subset only in 6 year span
+    mask = (df['date'] >= start) & (df['date'] <= end)
+    df = df.loc[mask]
 
-    # Parallel downloading
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_url = {executor.submit(fetch_single, url): url for url in urls}
-        for future in as_completed(future_to_url):
-            url, article = future.result()
-            results.append({'URL': url, 'article': article})
+    # Get 25 most frequent tickers
+    # top_symbols = df.symbol.value_counts().head(25).index.tolist()
+    # print(top_symbols)
+    # subset = df[df['symbol'].isin(top_symbols)]#.sample(n, random_state=42)
+    subset = df.sample(n, random_state=42)
+    print(subset)
+    tqdm.pandas(desc="Fetching article")
+    subset['article'] = subset.URL.progress_apply(extract_article)
 
-
-            df = pd.DataFrame(results)
-            return df
+    print(subset)
+    return subset
 
 
 def main():
@@ -119,18 +116,28 @@ def main():
     alln = load_headlines()
     alln.to_csv(DATA_DIR/'all_news_raw.csv', index=False)
 
-    tickers = sorted(set(alln['symbol'].dropna().unique()))
+    # tickers = sorted(set(alln['symbol'].dropna().unique()))
     # print(tickers)
 
     # Download historical prices
-    prices = fetch_price(tickers, batch_size=64)
-    print(prices.head())
-    prices.to_csv(DATA_DIR/'historical_prices.csv', index=False)
+    # prices = fetch_price(tickers, batch_size=64)
+    # print(prices.head())
+    # prices.to_csv(DATA_DIR/'historical_prices.csv', index=False)
+
+
+    prices = pd.read_csv('datasets/historical_prices.csv')
+
+    # remove articles without symbol in prices
+    alln = alln[alln['symbol'].isin(prices['symbol'].unique())]
+    alln.reset_index(drop=True)
+
+    # print(prices.head())
+
 
     # This commented code fetches all of the 3M+ articles 
     # Fetch full articles for at least 6 years
     # print("Fetching full articles (may take a while)...")
-    # alln = fetch_articles(alln5)
+    alln = fetch_articles(alln)
 
     # Fetch full articles in batches for demonstration (first 500 articles)
     # print("Fetching full articles in batches (demonstration subset)...")
@@ -141,23 +148,11 @@ def main():
     # alln.loc[demo_alln.index, 'article'] = demo_alln['article']
 
     # Save final merged dataset
-    # alln = alln.rename(columns={'URL': 'url'})
-    # alln = alln[['date','symbol','headline','url','article','publisher']]
-    # alln.to_csv(DATA_DIR/'all_news.csv', index=False)
+    alln = alln[['date','symbol','headline','URL','article','publisher']]
+    alln.to_csv(DATA_DIR/'all_news.csv', index=False)
     
     print("Saved historical_prices.csv and all_news.csv")
 
-    # Fetching full article
-    demo_alln = alln.head(500).copy()
-    article_df = fetch_articles(demo_alln['URL'])
-    demo_alln = demo_alln.merge(article_df, on='URL', how='left')
-
-
-    # Save combined dataset
-    demo_alln.to_csv(DATA_DIR / 'all_news.csv', index=False)
-
-
 if __name__ == '__main__':
     main()
-
 
