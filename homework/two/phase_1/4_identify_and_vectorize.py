@@ -12,11 +12,12 @@ nltk.download('punkt', quiet=True)
 nltk.download('punkt_tab', quiet=True)
 nltk.download('stopwords', quiet=True)
 
+STOPWORDS = stopwords.words("english")
 DATA_DIR = Path("datasets") 
 
 # Defining top sentiment words
 SENTIMENT_WORDS = [
-    "gain", "loss", "strong", "weak", "upgrade", "downgrade", "rise", "fall", "beat", "miss"
+    "gain", "loss", "strong", "weak", "win", "downgrade", "rise", "fall", "buy", "sell"
 ]
 
 # Text proecssing, cleaning and tokenizing text for sentiment analysis
@@ -37,7 +38,7 @@ def preprocess_text(text):
     tokens = word_tokenize(text)
 
     # Remove stopwords
-    tokens = [t for t in tokens if t not in stopwords.words("english")]
+    tokens = [t for t in tokens if t not in STOPWORDS]
 
     # Join back to string
     return " ".join(tokens)

@@ -39,7 +39,7 @@ class TradingBot:
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        model_path = Path('dtm_model_v1_final.pth')
+        model_path = Path('curated_model_v1_final.pth')
         sample_vec = np.stack(df.news_vector.values)[0]
         input_dim = sample_vec.shape[0]
         hidden_dim = 128
@@ -56,7 +56,6 @@ class TradingBot:
 
 
         for date, group in self.df.groupby('date'):
-
             x_batch = np.stack(group.news_vector.values)
             x_batch = torch.tensor(x_batch, dtype=torch.float32).to(self.device) 
 
@@ -78,6 +77,7 @@ class TradingBot:
         self._summarize()
 
     def _trade(self, date, symbol, price, score, headline=""):
+        print(score, date, symbol)
         if score > 0:
             x = max(1, floor((2 * (score / 100) * self.balance) / price))
             cost = x * price
@@ -129,7 +129,7 @@ class TradingBot:
 
     def _summarize(self):
         trade_df = pd.DataFrame(self.trade_log)
-        trade_df.to_csv("trade_log.csv", index=False)
+        trade_df.to_csv(DATA_DIR/"trade_log.csv", index=False)
 
         total_gain = self.balance - 100_000
         total_return = (self.balance / 100_000 - 1) * 100
@@ -138,7 +138,7 @@ class TradingBot:
             "total_gain_loss": total_gain,
             "total_return_%": total_return
         }])
-        summary.to_csv("final_summary.csv", index=False)
+        summary.to_csv(DATA_DIR/"final_summary.csv", index=False)
         print(summary)
 
 

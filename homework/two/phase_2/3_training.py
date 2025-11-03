@@ -130,9 +130,9 @@ def train_model(data_path, model_name, project="SentimentAnalysis"):
 
 def main():
    
-    train_model(DATA_DIR/"train_dtm.parquet", "dtm_model_v2")
-    train_model(DATA_DIR/"train_tfidf.parquet", "tfidf_model_v2")
-    train_model(DATA_DIR/"train_curated.parquet", "curated_model_v2")
+    train_model(DATA_DIR/"train_dtm.parquet", "dtm_model_v4")
+    train_model(DATA_DIR/"train_tfidf.parquet", "tfidf_model_v4")
+    train_model(DATA_DIR/"train_curated.parquet", "curated_model_v4")
 
 if __name__ == '__main__':
     main()

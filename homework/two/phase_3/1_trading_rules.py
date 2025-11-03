@@ -11,7 +11,7 @@ DATA_DIR = Path('datasets')
 def main():
 
     # Get the vectorized dataset we decided on
-    news = pd.read_parquet(DATA_DIR/'vectorized_news_tfidf.parquet')
+    news = pd.read_parquet(DATA_DIR/'vectorized_news_curated.parquet')
 
     # Get the prices
     prices = pd.read_csv(DATA_DIR/'historical_prices.csv', parse_dates=['date'])
