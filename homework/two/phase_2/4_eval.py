@@ -93,9 +93,9 @@ def evaluate_model(model_name, test_data_path):
 
 def main():
     model_names = [
-        "dtm_model_v0",
-        "tfidf_model_v0",
-        "curated_model_v0"
+        "dtm_model_v2",
+        "tfidf_model_v2",
+        "curated_model_v2"
     ]
 
     for name in model_names:

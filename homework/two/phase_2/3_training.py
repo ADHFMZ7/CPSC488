@@ -55,14 +55,27 @@ def train_model(data_path, model_name, project="SentimentAnalysis"):
 
     ds = load_dataset(data_path, device)
 
-    loader = DataLoader(ds, batch_size=BATCH_SIZE)
+    labels = ds.tensors[1].cpu().numpy()
+    class_counts = np.bincount(labels)
+    sample_weights = 1.0 / class_counts[labels]
+    sample_weights = torch.tensor(sample_weights, dtype=torch.float32)
+
+    sampler = torch.utils.data.WeightedRandomSampler(
+        weights=sample_weights,
+        num_samples=len(sample_weights),
+        replacement=True
+    )
+
+    loader = DataLoader(ds, batch_size=BATCH_SIZE, sampler=sampler)
    
     input_dim = ds.tensors[0].shape[1]
     hidden_dim = 128
     num_classes = 7
 
     model = Classifier(input_dim, hidden_dim, num_classes).to(device)
+
     criterion = nn.CrossEntropyLoss()
+
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
 
     wandb.config.update({
@@ -73,7 +86,7 @@ def train_model(data_path, model_name, project="SentimentAnalysis"):
         'batch_size': BATCH_SIZE,
         'optimizer': 'Adam',
         'loss': 'CrossEntropyLoss',
-        'epochs': 300,
+        'epochs': 50,
     })
 
     for epoch in range(wandb.config.epochs):
@@ -117,9 +130,9 @@ def train_model(data_path, model_name, project="SentimentAnalysis"):
 
 def main():
    
-    train_model(DATA_DIR/"train_dtm.parquet", "dtm_model_v0")
-    train_model(DATA_DIR/"train_tfidf.parquet", "tfidf_model_v0")
-    train_model(DATA_DIR/"train_curated.parquet", "curated_model_v0")
+    train_model(DATA_DIR/"train_dtm.parquet", "dtm_model_v2")
+    train_model(DATA_DIR/"train_tfidf.parquet", "tfidf_model_v2")
+    train_model(DATA_DIR/"train_curated.parquet", "curated_model_v2")
 
 if __name__ == '__main__':
     main()

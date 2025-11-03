@@ -9,6 +9,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from newspaper import Article
 import trafilatura
 
+from tqdm.asyncio import tqdm_asyncio
+import aiohttp
+import asyncio
+
 
 DATA_DIR = Path('datasets')
 DATA_DIR.mkdir(exist_ok=True)
@@ -75,47 +79,83 @@ def fetch_price(symbols, start='2010-01-01', end='2016-12-31', batch_size=128):
     all_data['symbol'] = all_data['symbol'].replace('^GSPC', 's&p')
     return all_data
 
+async def fetch_html_async(session, url, semaphore):
+    async with semaphore:
+        try:
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            async with session.get(url, headers=headers, timeout=10) as resp:
+                if resp.status != 200:
+                    return None
+                return await resp.text()
+        except Exception:
+            return None
 
-def extract_article(url):
-    try:    
-        html = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'}).text
-        text = trafilatura.extract(html)
-        if not text:
-            article = Article(url)
-            article.download()
-            article.parse()
-            text = article.text
-        return text
-    except Exception as e:
-        return None
 
-def fetch_articles(df, start='2010-01-01', end='2016-12-31', n=5000):
+def fetch_html(url):
+    r = requests.get(url, headers={'User-Agent': 'Mozilla/5.0'})
+    return r.content
 
-    # df of form Index(['date', 'symbol', 'headline', 'URL', 'publisher'], dtype='object')
 
-    # subset only in 6 year span
+
+def extract_article(html):
+    text = trafilatura.extract(html)
+    return text if text else None
+
+
+def fetch_articles(df, start='2011-01-01', end='2016-12-31'):
+    async def fetch_all_html(urls, max_concurrent=20):
+        semaphore = asyncio.Semaphore(max_concurrent)
+        async with aiohttp.ClientSession() as session:
+            tasks = [fetch_html_async(session, url, semaphore) for url in urls]
+            htmls = await tqdm_asyncio.gather(*tasks)
+        return htmls
+
+    # subset dataframe
     mask = (df['date'] >= start) & (df['date'] <= end)
     df = df.loc[mask]
 
-    # Get 25 most frequent tickers
+
     top_symbols = df.symbol.value_counts().head(6).index.tolist()
+    top_symbols += ['NVDA']
 
-    top_symbols += ['AAPL', 'AMZN', 'GOOG']
+    subset = df[df['symbol'].isin(top_symbols)]
+    print(f"{len(subset)} articles to fetch for symbols: {subset['symbol'].unique()}")
 
-    print(top_symbols)
+    # fetch HTML async 
+    htmls = asyncio.run(fetch_all_html(subset['URL'].tolist()))
+    subset = subset.copy()
+    subset['html'] = htmls
 
-    subset_list
+    subset.to_csv('datasets/savepoint.csv')
 
-
-
-    subset = df[df['symbol'].isin(top_symbols)]#.sample(n, random_state=42)
-    subset = df.sample(n, random_state=42)
-    print(subset)
-    tqdm.pandas(desc="Fetching article")
-    subset['article'] = subset.URL.progress_apply(extract_article)
-
-    print(subset)
+    subset['article'] = subset['html'].apply(extract_article)
     return subset
+
+# def fetch_articles(df, start='2010-01-01', end='2016-12-31', n=5000):
+#
+#     # df of form Index(['date', 'symbol', 'headline', 'URL', 'publisher'], dtype='object')
+#
+#     # subset only in 6 year span
+#     # mask = (df['date'] >= start) & (df['date'] <= end)
+#     mask = (df['date'] >= start) & (df['date'] <= end)
+#     df = df.loc[mask]
+#
+#     # Get 6 most frequent tickers
+#     # top_symbols = df.symbol.value_counts().head(6).index.tolist()
+#     # top_symbols += ['AAPL', 'AMZN', 'GOOG', 'NVDA', 'MSFT']
+#     top_symbols = ['AAPL', 'AMZN', 'GOOG', 'NVDA', 'MSFT']
+#
+#     subset = df[df['symbol'].isin(top_symbols)]#.sample(n, random_state=42)
+#     # subset = df.sample(n, random_state=42)
+#     print(len(subset))
+#     print(subset.symbol.unique())
+#     tqdm.pandas(desc="Fetching article")
+#     subset['html'] = subset.URL.progress_apply(fetch_html)
+#
+#     subset['requests'] = subset.html.progress_apply(extract_article)
+#
+#     print(subset)
+#     return subset
 
 
 def main():
