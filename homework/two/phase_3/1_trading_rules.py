@@ -10,7 +10,6 @@ DATA_DIR = Path('datasets')
 
 def main():
 
-
     # Get the vectorized dataset we decided on
     news = pd.read_parquet(DATA_DIR/'vectorized_news_tfidf.parquet')
 
@@ -18,7 +17,8 @@ def main():
     prices = pd.read_csv(DATA_DIR/'historical_prices.csv', parse_dates=['date'])
     
     dataset = pd.merge(news, prices, on=['date', 'symbol'], how='inner')
-    print(len(news), len(prices), len(dataset))  
+    dataset.to_parquet(DATA_DIR/'bot_dataset.parquet')
+    print("Saved bot dataset as bot_dataset.parquet")
 
 if __name__ == "__main__":
     main()
