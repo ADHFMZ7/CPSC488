@@ -105,15 +105,15 @@ def main():
     for method in ["dtm", "tfidf", "curated"]:
         matrix = vectorize_news(merged_df, method=method)
         out_df = merged_df.copy()
-    
+
         if method != "curated":
             out_df["news_vector"] = list(matrix.toarray())
         else:
             out_df["news_vector"] = list(matrix.tolist())
 
         out_df = out_df[["date", "symbol", "news_vector", "impact_score"]]
-        out_path = DATA_DIR / f"vectorized_news_{method}.csv"
-        out_df.to_csv(out_path, index=False)
+        out_path = DATA_DIR / f"vectorized_news_{method}.parquet"
+        out_df.to_parquet(out_path, index=False)
         print(f"Created {out_path.name}")
 
     print("\nAll vectorized datasets created successfully!")

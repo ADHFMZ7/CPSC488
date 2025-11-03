@@ -98,9 +98,17 @@ def fetch_articles(df, start='2010-01-01', end='2016-12-31', n=5000):
     df = df.loc[mask]
 
     # Get 25 most frequent tickers
-    # top_symbols = df.symbol.value_counts().head(25).index.tolist()
-    # print(top_symbols)
-    # subset = df[df['symbol'].isin(top_symbols)]#.sample(n, random_state=42)
+    top_symbols = df.symbol.value_counts().head(6).index.tolist()
+
+    top_symbols += ['AAPL', 'AMZN', 'GOOG']
+
+    print(top_symbols)
+
+    subset_list
+
+
+
+    subset = df[df['symbol'].isin(top_symbols)]#.sample(n, random_state=42)
     subset = df.sample(n, random_state=42)
     print(subset)
     tqdm.pandas(desc="Fetching article")
@@ -125,7 +133,7 @@ def main():
     # prices.to_csv(DATA_DIR/'historical_prices.csv', index=False)
 
 
-    prices = pd.read_csv('datasets/historical_prices.csv')
+    prices = pd.read_csv(DATA_DIR/'historical_prices.csv')
 
     # remove articles without symbol in prices
     alln = alln[alln['symbol'].isin(prices['symbol'].unique())]
