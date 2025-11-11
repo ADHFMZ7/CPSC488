@@ -8,6 +8,7 @@ dependencies = [
     "aiohttp>=3.10.11",
     "bs4>=0.0.2",
     "fastparquet>=2024.2.0",
+    "gensim>=4.3.3",
     "ipython>=8.12.3",
     "matplotlib>=3.7.5",
     "newspaper3k>=0.2.8",
